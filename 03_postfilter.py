@@ -16,12 +16,12 @@
 
 
 from collections import defaultdict
-from shutil import copyfile
 from tqdm import tqdm
 import argparse
 import json
 import logging
 import os
+import pathlib
 
 logging.basicConfig(level='INFO', 
                     format='%(asctime)s %(levelname)s: %(message)s')
@@ -43,13 +43,22 @@ parser.add_argument(
         '--max-c', type=int, required=False, default=None,
         help='Optional upper bound for c')
 parser.add_argument(
-        '-o', '--output-directory', 
+        '-o', '--output-directory', required=False, default=None,
         help='Output directory. If omitted, the directory name will be '
              'selected automatically based on the other parameters.')
 
 args = parser.parse_args()
 authors = sorted(os.listdir(args.input_directory))
 ignored_authors = set()
+if args.output_directory is None: 
+    output_name = f'{args.m}_{args.c}'
+    if args.max_c is not None:
+        output_name += f'_{args.max_c}'
+    indir = pathlib.Path(args.input_directory)
+    output_directory = os.path.join(indir.parent, output_name)
+else:
+    output_directory = args.output_directory
+
 for author in tqdm(authors):
     author_dir = os.path.join(args.input_directory, author)
     categories = sorted(os.listdir(author_dir))
@@ -76,9 +85,10 @@ for author in tqdm(authors):
 
     if author not in ignored_authors:
         for category in categories:
-            outdir = os.path.join(args.output_directory, author, category)
+            outdir = os.path.join(output_directory, author, category)
             os.makedirs(outdir)
             for post in good[category]:
                 src = os.path.join(author_dir, category, post)
                 dst = os.path.join(outdir, post)
-                copyfile(src, dst)
+                os.symlink(src, dst)
+print(f'dropped {len(ignored_authors)} authors ({len(authors) - len(ignored_authors)} remaining)') 
