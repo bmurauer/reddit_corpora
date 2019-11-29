@@ -33,7 +33,6 @@ logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s
 import tempfile
 import datetime
 
-index_location = '/storage/nas3/datasets/text/reddit_comments/indices'
 
 def find_overlap(index, limits):
     target_field = index['target_field']
@@ -151,8 +150,8 @@ def flush(key, values, output_directory):
         for v in values:
             o_f.write(json.dumps(v) + '\n')
 
-def create_cross_border_corpus(target_field, grouping_field, limits, input_files, c, m):
-    index = get_index(target_field, grouping_field, input_files, limits)
+def create_cross_border_corpus(target_field, grouping_field, limits, input_files, c, m, index_location):
+    index = get_index(target_field, grouping_field, input_files, limits, index_location)
 
     overlap = find_overlap(index, limits)
     limits[target_field] = overlap['target']
@@ -188,7 +187,7 @@ def create_cross_border_corpus(target_field, grouping_field, limits, input_files
     outdir = check_output_dir(f'{target_field}_{grouping_field}_{limits_string}_{m}_{c}_{timestamp}')
     store_result(posts, outdir)
 
-def get_index(target_field, grouping_field, input_files, limits):
+def get_index(target_field, grouping_field, input_files, limits, index_location):
     index_filename = os.path.join(index_location, f'{target_field}_{grouping_field}.json')
     if os.path.isfile(index_filename):
         try:
@@ -204,20 +203,20 @@ def get_index(target_field, grouping_field, input_files, limits):
                     logging.warning(f'stored fields:  {stored_target}, {stored_grouping}')
                     logging.warning(f'reqired fields: {target_field}, {grouping_field}' )
                     logging.warning('calculating new index')
-                    return calculate_new_index(target_field, grouping_field, input_files)
+                    return calculate_new_index(target_field, grouping_field, input_files, index_location)
                 else:
                     logging.info(f'using index: {index_filename}')
                     return index
         except Exception as e:
             logging.warning(f'exception during parsing index file {index_filename}: {e}')
             logging.warning('calculating new index')
-            return calculate_new_index(target_field, grouping_field, input_files)
+            return calculate_new_index(target_field, grouping_field, input_files, index_location)
     else:
         logging.warning(f'could not find filename {index_filename}, calculating new index')
-        return calculate_new_index(target_field, grouping_field, input_files)
+        return calculate_new_index(target_field, grouping_field, input_files, index_location)
 
         
-def calculate_new_index(target_field, grouping_field, files):
+def calculate_new_index(target_field, grouping_field, files, index_location):
     index_filename = os.path.join(index_location, f'{target_field}_{grouping_field}.json')
     values = defaultdict(set)
     unique_values = set()
@@ -268,7 +267,7 @@ parser.add_argument('-l', '--languages', default=None, help='which languages to 
 parser.add_argument('-s', '--subreddits', default=None, help='which subreddits to use')
 parser.add_argument('-m', default=1, type=int, help='How many documents must be present in each group per target')
 parser.add_argument('-c', default=1000, type=int, help='min. length of remaining documents')
-parser.add_argument('-o', '--output-directory', help='Output directory. If omitted, the directory name will be selected automatically based on the other parameters.')
+parser.add_argument('-idx', '--index-directory-location', default=os.path.expanduser('~'), help='Where to store intermediate index files')
 
 args = parser.parse_args()
 
@@ -296,7 +295,7 @@ if args.target_field == args.grouping_field:
 
 if args.grouping_field:
     logging.info(f'grouping by {args.grouping_field} for every {args.target_field}')
-    create_cross_border_corpus(args.target_field, args.grouping_field, limits, files, args.c, args.m)
+    create_cross_border_corpus(args.target_field, args.grouping_field, limits, files, args.c, args.m, args.index_directory_location)
 else:
     logging.info('not grouping')
     create_non_border_corpus(args.target_field, limits, files, args.c, args.m)
