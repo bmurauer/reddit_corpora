@@ -16,7 +16,7 @@
 
 
 from collections import defaultdict
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import argparse
 import json
 import logging
@@ -36,59 +36,76 @@ parser.add_argument(
 parser.add_argument(
         '-m', required=True, type=int, 
         help='How many documents must be present in each group per target')
+
 parser.add_argument(
         '-c', required=True, type=int, 
         help='min. length of remaining documents')
 parser.add_argument(
-        '--max-c', type=int, required=False, default=None,
-        help='Optional upper bound for c')
+        '--c-offset', type=int, required=False, default=500,
+        help='Upper boundary offset to lower C value [500]')
 parser.add_argument(
-        '-o', '--output-directory', required=False, default=None,
-        help='Output directory. If omitted, the directory name will be '
-             'selected automatically based on the other parameters.')
+        '--c-step-size', type=int, required=False, default=500,
+        help='C offset of one step [0]')
+parser.add_argument(
+        '--steps', type=int, required=False, default=1,
+        help='How many steps should be genererated [1]')
+
 
 args = parser.parse_args()
 authors = sorted(os.listdir(args.input_directory))
 ignored_authors = set()
-if args.output_directory is None: 
-    output_name = f'{args.m}_{args.c}'
-    if args.max_c is not None:
-        output_name += f'_{args.max_c}'
+
+if args.steps > 1 and args.c_step_size is None:
+    raise ValueError(f'please provide a c_step_size for more than 1 steps')
+
+if args.steps > 1 and args.c_step_size is not None and args.c_offset > args.c_step_size:
+    raise ValueError(f'your steps size ({args.c_step_size}) cant be larger '
+                     f'than your c_offset ({args.c_offset}), or your corpora '
+                     f'will have duplicate posts')
+
+post_map = defaultdict(dict)
+
+for step in trange(args.steps, desc='steps'):
+    c = args.c + step * args.c_step_size
+    c_max = None
+    if args.c_offset is not None:
+        c_max = c + args.c_offset
+
+    output_name = f'{args.m}_{c}'
+    if c_max is not None:
+        output_name += f'_{c_max}'
     indir = pathlib.Path(args.input_directory)
     output_directory = os.path.join(indir.parent, output_name)
-else:
-    output_directory = args.output_directory
 
-for author in tqdm(authors):
-    author_dir = os.path.join(args.input_directory, author)
-    categories = sorted(os.listdir(author_dir))
-    good = defaultdict(list)
-    bad = defaultdict(list)
-    for category in categories:
-        category_dir = os.path.join(author_dir, category)
-        posts = sorted(os.listdir(category_dir))
-
-        for post in posts:
-            src = os.path.join(category_dir, post)
-            with open(src) as i_f:
-                js = json.load(i_f)
-                size = len(js['body'])
-                if args.max_c and size > args.max_c: 
-                    bad[category].append(post)
-                elif size < args.c:
-                    bad[category].append(post)
-                else:
-                    good[category].append(post)
-
-        if len(good[category]) < args.m:
-            ignored_authors.add(author)
-
-    if author not in ignored_authors:
+    for author in tqdm(authors, desc='authors', leave=False):
+        author_dir = os.path.join(args.input_directory, author)
+        categories = sorted(os.listdir(author_dir))
+        good = defaultdict(list)
+        bad = defaultdict(list)
         for category in categories:
-            outdir = os.path.join(output_directory, author, category)
-            os.makedirs(outdir)
-            for post in good[category]:
-                src = os.path.join(author_dir, category, post)
-                dst = os.path.join(outdir, post)
-                os.symlink(src, dst)
-print(f'dropped {len(ignored_authors)} authors ({len(authors) - len(ignored_authors)} remaining)') 
+            category_dir = os.path.join(author_dir, category)
+            posts = sorted(os.listdir(category_dir))
+
+            for post in posts:
+                src = os.path.join(category_dir, post)
+                with open(src) as i_f:
+                    js = json.load(i_f)
+                    size = len(js['body'])
+                    if c_max is not None and size > c_max: 
+                        bad[category].append(post)
+                    elif size < c:
+                        bad[category].append(post)
+                    else:
+                        good[category].append(post)
+
+            if len(good[category]) < args.m:
+                ignored_authors.add(author)
+
+        if author not in ignored_authors:
+            for category in categories:
+                outdir = os.path.join(output_directory, author, category)
+                os.makedirs(outdir)
+                for post in good[category]:
+                    src = os.path.join(author_dir, category, post)
+                    dst = os.path.join(outdir, post)
+                    os.symlink(src, dst)
