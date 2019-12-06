@@ -12,6 +12,7 @@ numpy = "*"
 bs4 = "*"
 hoep = "*"
 pandas = "*"
+lxml = "*"
 
 [requires]
 python_version = "3.7"

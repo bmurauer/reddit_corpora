@@ -106,6 +106,11 @@ for step in trange(args.steps, desc='steps'):
                 outdir = os.path.join(output_directory, author, category)
                 os.makedirs(outdir)
                 for post in good[category]:
-                    src = os.path.join(author_dir, category, post)
-                    dst = os.path.join(outdir, post)
-                    os.symlink(src, dst)
+
+                    src_dir_abs = os.path.join(author_dir, category)
+                    src_dir_rel = os.path.relpath(src_dir_abs, outdir)
+
+                    src_file = os.path.join(src_dir_rel, post)
+                    out_file = os.path.join(outdir, post)
+
+                    os.symlink(src_file, out_file)
