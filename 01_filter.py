@@ -92,8 +92,11 @@ def analyze(msg):
 
 def work(filename):
     if not os.path.isdir(args.output_directory):
-        os.mkdir(args.output_directory)
+        os.makedirs(args.output_directory)
     output_filename = os.path.join(args.output_directory, os.path.basename(filename))
+    if os.path.isfile(output_filename): 
+        logging.info(f'skipping existing files: {filename}/{output_filename}')
+        return
     with open(filename) as i_f, open(output_filename, 'w') as o_f:
         reasons = defaultdict(int)
         for line in i_f:
@@ -124,7 +127,11 @@ def work(filename):
 
         d = dict(reasons)
         d['file'] = filename
-        with open(output_filename + '.stats', 'w') as o_f:
+        stats_dirname = os.path.join(args.output_directory, 'statistics')
+        if not os.path.isdir(stats_dirname): 
+            os.makedirs(stats_dirname)
+        stats_filename = os.path.join(stats_dirname, os.path.basename(filename) + '.stats')
+        with open(stats_filename, 'w') as o_f:
             json.dump(d, o_f)
 
 with mp.Pool(processes=args.jobs) as pool:
