@@ -24,8 +24,11 @@ from tqdm import tqdm
 files = sorted(glob.glob(f'{args.input_directory}/*.json'))
 for f in tqdm(files): 
     filename = os.path.basename(f)
-    author = os.path.splitext(filename)[0]
-    out_dir = os.path.join(args.output_directory, author, args.subreddit)
+    target = os.path.splitext(filename)[0]
+    if args.subreddit: 
+        out_dir = os.path.join(args.output_directory, target, args.subreddit)
+    else:
+        out_dir = os.path.join(args.output_directory, target)
     if not os.path.isdir(out_dir): 
         os.makedirs(out_dir)
     with open(f) as i_f:
