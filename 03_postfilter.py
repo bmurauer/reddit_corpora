@@ -41,15 +41,16 @@ parser.add_argument(
         '-c', required=True, type=int, 
         help='min. length of remaining documents')
 parser.add_argument(
-        '--c-offset', type=int, required=False, default=500,
-        help='Upper boundary offset to lower C value [500]')
+        '--c-offset', type=int, required=False, default=None,
+        help='Upper boundary offset to lower C value [None]')
 parser.add_argument(
         '--c-step-size', type=int, required=False, default=500,
         help='C offset of one step [0]')
 parser.add_argument(
         '--steps', type=int, required=False, default=1,
         help='How many steps should be genererated [1]')
-
+parser.add_argument('-o', '--output-directory', required=True, 
+        help='Output directory')
 
 args = parser.parse_args()
 authors = sorted(os.listdir(args.input_directory))
@@ -75,7 +76,9 @@ for step in trange(args.steps, desc='steps'):
     if c_max is not None:
         output_name += f'_{c_max}'
     indir = pathlib.Path(args.input_directory)
-    output_directory = os.path.join(indir.parent, output_name)
+    if not os.path.isdir(args.output_directory): 
+        os.makedirs(args.output_directory)
+    output_directory = os.path.join(args.output_directory, output_name)
 
     for author in tqdm(authors, desc='authors', leave=False):
         author_dir = os.path.join(args.input_directory, author)

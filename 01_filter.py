@@ -51,7 +51,7 @@ logging.info(f'read {len(files)} files, starting work')
 
 def remove_markdown(text):
     html = h.render(text)
-    return BS(html, features='html5lib').get_text()
+    return BS(html, features='lxml').get_text()
 
 def remove_citations(text):
     lines = text.split('\n')
@@ -69,22 +69,24 @@ def clean(text):
 def not_enough_characters(msg): 
     return len(msg['body_clean']) < args.post_characters_threshold
 
-def not_enough_words(msg):
-    return len(msg['words']) < args.post_words_threshold
+def not_enough_words(words):
+    return len(words) < args.post_words_threshold
 
-def not_enough_different_words(msg):
-    return len(set(msg['words'])) < args.post_vocabulary_threshold
+def not_enough_different_words(words):
+    return len(set(words)) < args.post_vocabulary_threshold
 
 def is_bot(msg): 
     return msg['author'] in botlist
 
 def analyze(msg): 
     reasons = set()
+    words = msg['body_clean'].translate(
+        str.maketrans('', '', string.punctuation)).split()
     if not_enough_characters(msg):
         reasons.add('not enough characters')
-    if not_enough_words(msg):
+    if not_enough_words(words):
         reasons.add('not enough words')
-    if not_enough_different_words(msg):
+    if not_enough_different_words(words):
         reasons.add('not enough different words')
     if is_bot(msg): 
         reasons.add('is a bot')
@@ -93,7 +95,11 @@ def analyze(msg):
 def work(filename):
     if not os.path.isdir(args.output_directory):
         os.makedirs(args.output_directory)
-    output_filename = os.path.join(args.output_directory, os.path.basename(filename))
+    split_dir = os.path.basename(os.path.dirname(filename))
+    outdir = os.path.join(args.output_directory, split_dir)
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
+    output_filename = os.path.join(outdir, os.path.basename(filename))
     if os.path.isfile(output_filename): 
         logging.info(f'skipping existing files: {filename}/{output_filename}')
         return
@@ -103,26 +109,24 @@ def work(filename):
             try: 
                 msg = json.loads(line)
                 msg['body_clean']= clean(msg['body'])
-                msg['words'] = msg['body_clean'].translate(str.maketrans('', '', string.punctuation)).split()
                 msg_reasons = analyze(msg)
                 if not msg_reasons:
-                    language_scores = sorted(list(detect_langs(msg['body'])), key=lambda x: x.prob, reverse=True)
+                    language_scores = sorted(
+                        list(detect_langs(msg['body_clean'])), 
+                        key=lambda x: x.prob, 
+                        reverse=True)
                     scores = [x.prob for x in language_scores]
                     langs = [x.lang for x in language_scores]
                     if scores[0] > args.lang_detect_probability:
-                        payload = {
-                            'language': langs[0],
-                            'subreddit': msg['subreddit'],
-                            'author': msg['author'],
-                            'body': msg['body_clean']
-                        }
-                        o_f.write(json.dumps(payload) + '\n')
+                        msg['language'] = langs[0]
+                        o_f.write(json.dumps(msg) + '\n')
                         msg_reasons.add('success')
                     else:
                         msg_reasons.add('language unclear')
                 for r in msg_reasons:
                     reasons[r] += 1
-            except Exception: 
+            except Exception as e: 
+                reasons["ERROR: " + str(e)] += 1
                 continue
 
         d = dict(reasons)
@@ -130,7 +134,9 @@ def work(filename):
         stats_dirname = os.path.join(args.output_directory, 'statistics')
         if not os.path.isdir(stats_dirname): 
             os.makedirs(stats_dirname)
-        stats_filename = os.path.join(stats_dirname, os.path.basename(filename) + '.stats')
+        stats_filename = os.path.join(
+            stats_dirname, 
+            os.path.basename(filename) + '.stats')
         with open(stats_filename, 'w') as o_f:
             json.dump(d, o_f)
 
