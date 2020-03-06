@@ -49,6 +49,7 @@ for author in authors:
     for topic in topics:
         topic_dir = os.path.join(author_dir, topic)
         documents = sorted(os.listdir(topic_dir))
+        documents = [x for x in documents if '.json' in x]
         topicdata[topic].append(len(documents))
         doclengths = 0
         for document in documents:
