@@ -14,24 +14,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.    If not, see <https://www.gnu.org/licenses/>.
 
-from bots import botlist
-from bs4 import BeautifulSoup as BS
-from collections import defaultdict
-from langdetect import detect_langs
-
 import argparse
 import glob
-import hoep as h
 import json
 import logging
 import multiprocessing as mp
-import numpy as np
 import os
-import pandas as pd
 import re
 import string
-import time
+from collections import defaultdict
+
+import hoep as h
 import tqdm
+from bs4 import BeautifulSoup as BS
+from langdetect import detect_langs
+
+from bots import botlist
 
 logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
 
@@ -78,6 +76,8 @@ def not_enough_different_words(words):
 def is_bot(msg): 
     return msg['author'] in botlist
 
+printed_reasons = set()
+
 def analyze(msg): 
     reasons = set()
     words = msg['body_clean'].translate(
@@ -88,7 +88,10 @@ def analyze(msg):
         reasons.add('not enough words')
     if not_enough_different_words(words):
         reasons.add('not enough different words')
-    if is_bot(msg): 
+    if is_bot(msg):
+        if 'bot' not in printed_reasons:
+            printed_reasons.add('bot')
+            print('bot', msg['body'])
         reasons.add('is a bot')
     return reasons
 
@@ -110,9 +113,15 @@ def work(filename):
                 msg = json.loads(line)
                 msg['body_clean']= clean(msg['body'])
                 msg_reasons = analyze(msg)
+
+                if 'not enough words' not in msg_reasons and 'not enough different words' in msg_reasons:
+                    print('voc richness', msg)
+                # if 'not enough characters' not in msg_reasons and 'not enough words' in msg_reasons:
+                #     print('words', msg)
+
                 if not msg_reasons:
                     language_scores = sorted(
-                        list(detect_langs(msg['body_clean'])), 
+                        list(detect_langs(msg['body_clean'])),
                         key=lambda x: x.prob, 
                         reverse=True)
                     scores = [x.prob for x in language_scores]
