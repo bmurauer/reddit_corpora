@@ -179,7 +179,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.6.1,<4"
-content-hash = "2ce359eb767ad19ec8e28b63e822bc39576ef755448608674738aa3b61a98bcd"
+content-hash = "a021ba4badaecae78d3697499f4c3351e4dfe303617c756d61bf1a0f84c99d6a"
 
 [metadata.files]
 beautifulsoup4 = [
