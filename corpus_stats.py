@@ -45,6 +45,8 @@ topicdata = defaultdict(list)
 topicsizedata = defaultdict(list)
 for author in authors:
     author_dir = os.path.join(args.input_directory, author)
+    if not os.path.isdir(author_dir): 
+        continue
     topics = sorted(os.listdir(author_dir))
     for topic in topics:
         topic_dir = os.path.join(author_dir, topic)
